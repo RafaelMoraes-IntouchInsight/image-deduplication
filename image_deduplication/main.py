@@ -7,6 +7,14 @@ from sklearn.preprocessing import StandardScaler
 # Supported image extensions by cv2.imread
 supported_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
 
+# Number of RANSAC-verified keypoint matches above which two images are
+# considered the same scene.
+SIMILARITY_THRESHOLD = 10
+
+# findHomography needs at least 4 point correspondences; the original 50 keeps
+# the estimate well conditioned.
+MIN_MATCHES_FOR_HOMOGRAPHY = 50
+
 def _find_group(groups, image_name):
     if groups[image_name] != image_name:
         groups[image_name] = _find_group(groups, groups[image_name])
@@ -51,17 +59,23 @@ def _match_images(query_img_desc, idx_desc):
     Returns:
     - similarity_score: An integer representing the similarity score between the two images
     """
+    # A featureless image (blank, very dark, very small) yields no descriptors,
+    # and knnMatch needs at least two candidates per query to run the ratio test.
+    query_desc, index_desc = query_img_desc[1], idx_desc[1]
+    if query_desc is None or index_desc is None or len(index_desc) < 2:
+        return 0
+
     # Initialize BFMatcher
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
 
     # Use BFMatcher to find the best matches
-    matches = bf.knnMatch(query_img_desc[1], idx_desc[1], k=2)
+    matches = bf.knnMatch(query_desc, index_desc, k=2)
 
     # Apply ratio test to find good matches
     good_matches = [m for m, n in matches if m.distance < 0.75*n.distance]
 
-    # We need at least 50 matches to apply Homography
-    if len(good_matches) > 50:
+    # We need enough matches to apply Homography
+    if len(good_matches) > MIN_MATCHES_FOR_HOMOGRAPHY:
         # Prepare data for cv2.findHomography
         src_pts = np.float32([query_img_desc[0][m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
         dst_pts = np.float32([idx_desc[0][m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
@@ -121,12 +135,16 @@ def get_image_paths(folder_path: str, depth: int=None, sanity_check: bool=False)
 
     return readable_image_paths
 
-def cluster_images(image_paths: list[str]) -> list:
+def cluster_images(image_paths: list[str], detect_mirrored: bool = False) -> list:
     """
     Cluster the given images based on similarity and return a list of grouped images.
     
     Parameters:
     image_paths (list): A list of file paths to the images to be clustered.
+    detect_mirrored (bool): Also match each image against the horizontal mirror of
+        the others. ORB descriptors are not mirror invariant, so without this a
+        horizontally flipped copy scores as unrelated. Off by default because it
+        roughly doubles the pairwise matching work.
     
     Returns:
     list: A list where the each value is a list of image file paths that correspond to grouped images.
@@ -142,6 +160,14 @@ def cluster_images(image_paths: list[str]) -> list:
     # Create descriptors for indexed images
     indexed_img_descs = [_extract_orb_features(image) for image in indexed_images]
 
+    # Descriptors of the mirrored images, used only when detect_mirrored is set.
+    # Flipping the pixels and re-extracting is what makes a mirrored duplicate
+    # matchable at all -- the descriptors themselves cannot simply be reversed.
+    mirrored_img_descs = (
+        [_extract_orb_features(cv2.flip(image, 1)) for image in indexed_images]
+        if detect_mirrored else None
+    )
+
     # Initialize a dictionary to store similarity groups
     similarity_groups = {name: name for name in image_paths}
     num_images = len(indexed_img_descs)
@@ -149,7 +175,13 @@ def cluster_images(image_paths: list[str]) -> list:
     for i in range(num_images):
         for j in range(i + 1, num_images):
             similarity = _match_images(indexed_img_descs[i], indexed_img_descs[j])
-            if similarity > 10:  # Adjust the similarity threshold as needed
+
+            # Only pay for the mirrored comparison when the direct one did not
+            # already identify the pair.
+            if similarity <= SIMILARITY_THRESHOLD and detect_mirrored:
+                similarity = _match_images(mirrored_img_descs[i], indexed_img_descs[j])
+
+            if similarity > SIMILARITY_THRESHOLD:
                 _union(similarity_groups, image_paths[i], image_paths[j])
 
     # Convert the similarity_groups dictionary into a format where each group is a list

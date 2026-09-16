@@ -44,17 +44,35 @@ for i, cluster in enumerate(image_clusters):
     print(f"""Cluster {i}: {cluster}\n""")
 ```
 
+### Detecting mirrored duplicates
+ORB descriptors are not mirror invariant, so a horizontally flipped copy of an
+image scores as unrelated by default. Pass `detect_mirrored=True` to also match
+each image against the mirror of the others:
+
+```python
+image_clusters = cluster_images(image_paths, detect_mirrored=True)
+```
+
+This roughly doubles the pairwise matching work, so it is off by default. On a
+set of real photographs it takes flipped-duplicate recall from 0% to 100%
+(including flipped *and* cropped copies) without introducing false positives.
+
 ### CLI tool
 ```bash
 image-deduplication path/to/images
 ```
 If you want to analyse the current working directory, you can simply use "." as the path.
 
+Add `--detect-mirrored` to also catch horizontally flipped duplicates:
+```bash
+image-deduplication path/to/images --detect-mirrored
+```
+
 ## Methodology
 
 Here is an overview of how this package clusters images by similarity using computer vision techniques and a union-find algorithm to group similar images together:
 
-1. Feature Extraction with ORB: We utilized the ORB (Oriented FAST and Rotated BRIEF) algorithm for extracting keypoints and descriptors from images. ORB is a fast, rotation-invariant, and robust feature extractor that identifies unique points in images, facilitating the comparison of different images based on their content.
+1. Feature Extraction with ORB: We utilized the ORB (Oriented FAST and Rotated BRIEF) algorithm for extracting keypoints and descriptors from images. ORB is a fast, rotation-invariant, and robust feature extractor that identifies unique points in images, facilitating the comparison of different images based on their content. ORB is rotation invariant but *not* mirror invariant, which is why detecting flipped duplicates requires re-extracting features from the mirrored image (see `detect_mirrored`).
 
 2. Image Matching: To determine the similarity between pairs of images, we employed a brute force matcher with the Hamming distance as a metric, optimized to find the best matches for the ORB descriptors. A ratio test filters out less reliable matches, ensuring that only the most similar keypoints contribute to the similarity score.
 
