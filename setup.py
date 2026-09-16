@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name="image-deduplication",
-    version="0.1.3",
+    version="0.2.0",
     description="Finds images that have a high degree of similarity",
     long_description=pathlib.Path("README.md").read_text(),
     long_description_content_type="text/markdown",
