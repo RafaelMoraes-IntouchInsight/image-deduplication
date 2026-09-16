@@ -28,7 +28,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.12",
     ],
     python_requires=">=3.8",
-    install_requires=["opencv-python", "numpy", "scikit-learn"],
+    install_requires=["opencv-python", "numpy"],
     packages=setuptools.find_packages(),
     include_package_data=True,
     entry_points={"console_scripts": ["image-deduplication = image_deduplication.cli:main"]},

@@ -1,8 +1,6 @@
 import os
 import cv2
 import numpy as np
-from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import StandardScaler
 
 # Supported image extensions by cv2.imread
 supported_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
