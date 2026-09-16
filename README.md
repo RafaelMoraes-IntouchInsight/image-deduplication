@@ -68,6 +68,18 @@ Add `--detect-mirrored` to also catch horizontally flipped duplicates:
 image-deduplication path/to/images --detect-mirrored
 ```
 
+## Development
+
+Install the package together with the development tools, then run the tests:
+
+```bash
+pip install -e . -r requirements-dev.txt
+pytest tests/
+```
+
+`-e .` is what pulls in the runtime dependencies (OpenCV, NumPy) and puts
+`image_deduplication` on the path.
+
 ## Methodology
 
 Here is an overview of how this package clusters images by similarity using computer vision techniques and a union-find algorithm to group similar images together:

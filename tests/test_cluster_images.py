@@ -48,12 +48,16 @@ def _clustered_together(clusters, a, b):
     return any(a in group and b in group for group in clusters)
 
 
-def test_mirrored_duplicate_is_missed_by_default(tmp_path, base_image):
-    """Documents the default: ORB descriptors are not mirror invariant."""
+def test_mirrored_duplicate_is_missed_when_disabled(tmp_path, base_image):
+    """ORB descriptors are not mirror invariant, so the flag is what buys this.
+
+    Pins the behaviour of detect_mirrored=False rather than the default's value,
+    so flipping the default later is not reported here as a regression.
+    """
     a = _write(tmp_path, "original", base_image)
     b = _write(tmp_path, "mirrored", cv2.flip(base_image, 1))
 
-    clusters = cluster_images([a, b])
+    clusters = cluster_images([a, b], detect_mirrored=False)
 
     assert not _clustered_together(clusters, a, b)
 

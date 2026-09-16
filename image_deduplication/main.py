@@ -178,6 +178,13 @@ def cluster_images(image_paths: list[str], detect_mirrored: bool = False) -> lis
 
             # Only pay for the mirrored comparison when the direct one did not
             # already identify the pair.
+            #
+            # Only mirror(i) vs j is tried, not mirror(j) vs i. Mirroring is
+            # symmetric in principle, but _match_images is not exactly so (the
+            # ratio test and RANSAC run from the query side), so the two
+            # directions can score differently when the images differ a lot in
+            # keypoint count. On 25 real flipped-and-cropped pairs both
+            # directions always agreed, so the second is not worth its cost.
             if similarity <= SIMILARITY_THRESHOLD and detect_mirrored:
                 similarity = _match_images(mirrored_img_descs[i], indexed_img_descs[j])
 
